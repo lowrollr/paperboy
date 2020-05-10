@@ -1,2 +1,2 @@
 # paperboy
-a discord server-wider day trading bot
+a discord server-wide trading manager
