@@ -9,7 +9,7 @@ import csv
 import pymongo
 import json
 
-
+load_dotenv()
 client = pymongo.MongoClient('mongodb+srv://dbAdmin:'+os.getenv('DB_PASS')+'@paperboy-cluster-owzvv.gcp.mongodb.net/test?retryWrites=true&w=majority')
 db = client.get_default_database()
 accounts = db['Accounts']
@@ -18,11 +18,10 @@ sell_order_regex = re.compile('^\!sell (.*) (.*)')
 buy_order_regex = re.compile('^\!buy (.*) (.*)')
 price_regex = re.compile('^\!price (.*)')
 
-my_server_name = None
 
 scores = {}
 
-load_dotenv()
+
 TOKEN = os.getenv('DISCORD_TOKEN')
 SERVER = os.getenv('DISCORD_SERVER')
 client = discord.Client()
@@ -31,19 +30,18 @@ client = discord.Client()
 api = alpaca.REST(os.getenv('API_KEY'), os.getenv('SECRET_KEY'), os.getenv('ENDPOINT_URL'))
 
 
-def get_account_info():
-    return accounts.find_one({'server': str(my_server_name)})
+def get_account_info(guild):
+    return accounts.find_one({'server': guild})
 
 
 @client.event
 async def on_ready():
-    my_server = discord.utils.get(client.guilds, name=SERVER)
-    print('Bot connected to discord on server: ' + str(my_server))
-    doc = accounts.find_one({'server': str(my_server)})
-    if not doc:
-        accounts.insert_one({'server': str(my_server), 'balance': 1000000, 'positions': {}})
-    global my_server_name
-    my_server_name = str(my_server)
+    for my_server in client.guilds:
+        print('Bot connected to discord on server: ' + str(my_server))
+        doc = accounts.find_one({'server': str(my_server)})
+        if not doc:
+            accounts.insert_one({'server': str(my_server), 'balance': 1000000, 'positions': {}})
+        
 
 
 @client.event
@@ -78,7 +76,7 @@ async def on_message(message):
                         await message.channel.send('Invalid amount! Please use !sell <ticker> <amount>')
                         good_input = False
                     if good_input:
-                        info = get_account_info()
+                        info = get_account_info(message.guild.name)
                         positions = info['positions']
                         amount = int(positions[ticker]['amount'])
                         amount_balance = float(positions[ticker]['balance'])
@@ -102,11 +100,11 @@ async def on_message(message):
                                 if positions:
                                     positions[ticker]['amount'] = amount
                                     positions[ticker]['balance'] = amount_balance
-                                accounts.update_one({'server': my_server_name}, {'$set': {'positions': positions}})
+                                accounts.update_one({'server': message.guild.name}, {'$set': {'positions': positions}})
                             else:
-                                await message.channel.send(my_server_name + ' only owns ' + str(positions[ticker]['amount']) + ' shares of ' + ticker + ', cannot sell ' + str(val) + ' shares!')
+                                await message.channel.send(message.guild.name + ' only owns ' + str(positions[ticker]['amount']) + ' shares of ' + ticker + ', cannot sell ' + str(val) + ' shares!')
                         else:
-                            await message.channel.send(my_server_name + ' does not own any positions in ' + ticker + '!')                   
+                            await message.channel.send(message.guild.name + ' does not own any positions in ' + ticker + '!')                   
                 else:
                     await message.channel.send('Invalid amount! Please use !sell <ticker> <amount>')
             else:
@@ -132,7 +130,7 @@ async def on_message(message):
                         good_input = False
                     if good_input:
                         total_value = price * val
-                        info = get_account_info()
+                        info = get_account_info(message.guild.name)
                         positions = info['positions']
                         account_balance = int(info['balance'])
                         if total_value > account_balance:
@@ -145,8 +143,8 @@ async def on_message(message):
                                 positions[ticker] = {}
                                 positions[ticker]['amount'] = val
                                 positions[ticker]['balance'] = total_value
-                            accounts.update_one({'server': my_server_name}, {'$set': {'positions': positions}})
-                            accounts.update_one({'server': my_server_name}, {'$set': {'balance': account_balance - total_value}})
+                            accounts.update_one({'server': message.guild.name}, {'$set': {'positions': positions}})
+                            accounts.update_one({'server': message.guild.name}, {'$set': {'balance': account_balance - total_value}})
                             await message.channel.send('Buy Order executed! ' + str(val) + ' shares of ' + ticker + ' were purchased for $' + str(price) + ' each!')
                 else:
                     await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount>')
@@ -156,8 +154,8 @@ async def on_message(message):
             await message.channel.send('Invalid command! Please use !buy <ticker> <amount>')
 
     elif '!account' in message.content:
-        my_message = '\n' + str(my_server_name) + ' Trading Account Summary:'
-        info = get_account_info()
+        my_message = '\n' + str(message.guild.name) + ' Trading Account Summary:'
+        info = get_account_info(message.guild.name)
         total_account_value = int(info['balance'])
         my_message += '\nPositions:'
         for x in info['positions']:
