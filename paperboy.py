@@ -95,12 +95,14 @@ async def on_message(message):
                                     my_message += 'loss'
                                 else:
                                     my_message += 'gain'
-                                my_message += ' of $' + str(abs(gain_per_share)) + ' ( ' + str(round(100.0*(gain_per_share/avg_price), 2)) + '% )'
+                                my_message += ' of $' + str(abs(gain_per_share)) + ' per share, or ' + str(abs(gain_per_share * val)) + ' total ( ' + str(round(100.0*(gain_per_share/avg_price), 2)) + '% )'
                                 await message.channel.send(my_message)
                                 if positions:
-                                    positions[ticker]['amount'] = amount
-                                    positions[ticker]['balance'] = amount_balance
+                                    if amount:
+                                        positions[ticker]['amount'] = amount
+                                        positions[ticker]['balance'] = amount_balance
                                 accounts.update_one({'server': message.guild.name}, {'$set': {'positions': positions}})
+                                accounts.update_one({'server': message.guild.name}, {'$set': {'balance': account_balance + total_sell_price}})
                             else:
                                 await message.channel.send(message.guild.name + ' only owns ' + str(positions[ticker]['amount']) + ' shares of ' + ticker + ', cannot sell ' + str(val) + ' shares!')
                         else:
@@ -156,7 +158,7 @@ async def on_message(message):
     elif '!account' in message.content:
         my_message = '\n' + str(message.guild.name) + ' Trading Account Summary:'
         info = get_account_info(message.guild.name)
-        total_account_value = int(info['balance'])
+        total_account_value = float(info['balance'])
         my_message += '\nPositions:'
         for x in info['positions']:
             amount = float(info['positions'][x]['amount'])
@@ -181,5 +183,8 @@ async def on_message(message):
         my_message += '\nAccount Buying Power: $' + str(round(info['balance'], 2))
         my_message += '\nTotal Account Value : $' + str(round(total_account_value, 2))
         await message.channel.send(my_message)
-
+    elif '!help' in message.content:
+        my_message = "!account: displays account balance, buying power, and current held positions\n!buy : If able, purchases X shares of a given ticker for it's current price\n!sell : If able, sells X shares of a given ticker from your server's portfolio\n!price : Get the current price of a given ticker\nAll ticker names and prices are referenced from NASDAQ."
+        await message.channel.send(my_message)
+        
 client.run(TOKEN)
