@@ -96,7 +96,7 @@ def collect():
                     update_account_history_min(first)
                     done = True
                     
-                read_prices_to_db(first)
+                read_prices_to_db()
                 next_1_min = datetime.datetime.now().minute + 1
                 if first:
                     first = False

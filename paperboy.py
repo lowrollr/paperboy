@@ -3,7 +3,6 @@ import re
 import discord
 from dotenv import load_dotenv
 import alpaca_trade_api as alpaca
-from timeloop import Timeloop
 from datetime import datetime, timedelta
 import time
 import csv
@@ -256,8 +255,6 @@ async def on_message(message):
 
 def start_discord_client():    
     client.run(TOKEN)
-
-
 
 if __name__ == '__main__':
     start_discord_client()
