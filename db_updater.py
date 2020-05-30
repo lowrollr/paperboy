@@ -34,7 +34,6 @@ def read_prices_to_db():
     db_prices.replace_one(filter={}, replacement=prices, upsert=True)
     
 
-
 def update_prices():
     global prices
     symbols = set()
@@ -103,12 +102,8 @@ def collect():
     update_prices()
     update_account_history_min(False)    
     read_prices_to_db()
-        
-
 
 while(True):
-    now = datetime.datetime.now()
-    mrkt_open = now.replace(hour=14, minute=30)
-    if mrkt_open == now:
+    if clock.is_open:
         collect()
     

@@ -143,7 +143,7 @@ async def on_message(message):
                 positions = info['positions']
                 amount = int(positions[ticker]['amount'])
                 amount_balance = float(positions[ticker]['balance'])
-                account_balance = int(info['balance'])
+                account_balance = float(info['balance'])
                 if ticker in positions:
                     avg_price = amount_balance / amount
                     if val <= amount:
@@ -204,7 +204,7 @@ async def on_message(message):
                 total_value = price * val
                 info = get_account_info(message.author.id)
                 positions = info['positions']
-                account_balance = int(info['balance'])
+                account_balance = float(info['balance'])
                 if total_value > account_balance:
                     await message.channel.send('Not enough funds, account balance is $' + str(account_balance) + ', but this trade requires $' + str(total_value))
                     return
