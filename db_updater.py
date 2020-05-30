@@ -79,7 +79,7 @@ def update_account_history_min(first):
 
 def collect():
     first = True
-    while not clock.is_open:
+    while clock.is_open:
         print('collecting!')
         now = datetime.datetime.now()
         next_1_min = (now.minute)%60
@@ -109,7 +109,6 @@ def collect():
 while(True):
     now = datetime.datetime.now()
     mrkt_open = now.replace(hour=14, minute=30)
-    collect()
     if mrkt_open == now:
         collect()
     
