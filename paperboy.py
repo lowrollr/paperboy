@@ -33,8 +33,7 @@ SERVER = os.getenv('DISCORD_SERVER')
 #initialize discord client
 client = discord.Client()
 
-#init timeloop for time-interval events
-tl = Timeloop()
+
 
 #initialize alpaca api
 api = alpaca.REST(os.getenv('API_KEY'), os.getenv('SECRET_KEY'), os.getenv('ENDPOINT_URL'))
