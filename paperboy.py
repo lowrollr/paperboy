@@ -30,17 +30,19 @@ client = discord.Client()
 api = alpaca.REST(os.getenv('API_KEY'), os.getenv('SECRET_KEY'), os.getenv('ENDPOINT_URL'))
 
 
-def get_account_info(guild):
-    return accounts.find_one({'server': guild})
+def get_account_info(player):
+    target_account = accounts.find_one({'player_id': player})
+    if not target_account:
+        my_json = {'player_id': player, 'balance': 1000000, 'positions': {}}
+        accounts.insert_one(my_json)
+        return my_json
+    return target_account
 
 
 @client.event
 async def on_ready():
     for my_server in client.guilds:
         print('Bot connected to discord on server: ' + str(my_server))
-        doc = accounts.find_one({'server': str(my_server)})
-        if not doc:
-            accounts.insert_one({'server': str(my_server), 'balance': 1000000, 'positions': {}})
         
 
 
@@ -63,54 +65,60 @@ async def on_message(message):
     elif '!sell' in message.content:
         msg = sell_order_regex.match(str(message.content))
         if msg != None:
-            ticker = msg.group(1)
+            ticker = msg.group(1).upper()
             ticker_info = api.get_barset(ticker, 'minute', limit=1)[ticker]
-            if ticker_info:
-                price = ticker_info[0].c
-                if price != None:
-                    good_input = True
-                    val = -1
-                    try:
-                        val = int(msg.group(2))
-                    except ValueError:
-                        await message.channel.send('Invalid amount! Please use !sell <ticker> <amount>')
-                        good_input = False
-                    if good_input:
-                        info = get_account_info(message.guild.name)
-                        positions = info['positions']
-                        amount = int(positions[ticker]['amount'])
-                        amount_balance = float(positions[ticker]['balance'])
-                        account_balance = int(info['balance'])
-                        if ticker in positions:
-                            avg_price = amount_balance / amount
-                            if val <= amount:
-                                total_sell_price = val * float(price)
-                                if val == amount:
-                                    del positions[ticker]
-                                gain_per_share = round(float(price) - avg_price, 2)
-                                amount -= val
-                                amount_balance -= total_sell_price
-                                my_message = 'Sell Order Executed! ' + str(val) + ' shares of ' + ticker + ' were sold for $' + str(price) + ' each, for a '
-                                if gain_per_share < 0:
-                                    my_message += 'loss'
-                                else:
-                                    my_message += 'gain'
-                                my_message += ' of $' + str(abs(gain_per_share)) + ' per share, or ' + str(abs(gain_per_share * val)) + ' total ( ' + str(round(100.0*(gain_per_share/avg_price), 2)) + '% )'
-                                await message.channel.send(my_message)
-                                if positions:
-                                    if amount:
-                                        positions[ticker]['amount'] = amount
-                                        positions[ticker]['balance'] = amount_balance
-                                accounts.update_one({'server': message.guild.name}, {'$set': {'positions': positions}})
-                                accounts.update_one({'server': message.guild.name}, {'$set': {'balance': account_balance + total_sell_price}})
-                            else:
-                                await message.channel.send(message.guild.name + ' only owns ' + str(positions[ticker]['amount']) + ' shares of ' + ticker + ', cannot sell ' + str(val) + ' shares!')
-                        else:
-                            await message.channel.send(message.guild.name + ' does not own any positions in ' + ticker + '!')                   
-                else:
+            amnt_msg_group = 2
+            if not ticker_info:
+                ticker = msg.group(2).upper()
+                ticker_info = api.get_barset(ticker, 'minute', limit=1)[ticker]
+                amnt_msg_group = 1
+                if not ticker_info:
+                    await message.channel.send('Invalid ticker! Please use !sell <ticker> <amount>')
+                    return
+            price = ticker_info[0].c
+            if price != None:
+                good_input = True
+                val = -1
+                try:
+                    val = int(msg.group(amnt_msg_group))
+                except ValueError:
                     await message.channel.send('Invalid amount! Please use !sell <ticker> <amount>')
+                    good_input = False
+                if good_input:
+                    info = get_account_info(message.author.id)
+                    positions = info['positions']
+                    amount = int(positions[ticker]['amount'])
+                    amount_balance = float(positions[ticker]['balance'])
+                    account_balance = int(info['balance'])
+                    if ticker in positions:
+                        avg_price = amount_balance / amount
+                        if val <= amount:
+                            total_sell_price = val * float(price)
+                            if val == amount:
+                                del positions[ticker]
+                            gain_per_share = round(float(price) - avg_price, 2)
+                            amount -= val
+                            amount_balance -= total_sell_price
+                            my_message = 'Sell Order Executed! ' + str(val) + ' shares of ' + ticker + ' were sold for $' + str(price) + ' each, for a '
+                            if gain_per_share < 0:
+                                my_message += 'loss'
+                            else:
+                                my_message += 'gain'
+                            my_message += ' of $' + str(abs(gain_per_share)) + ' per share, or ' + str(abs(gain_per_share * val)) + ' total ( ' + str(round(100.0*(gain_per_share/avg_price), 2)) + '% )'
+                            await message.channel.send(my_message)
+                            if positions:
+                                if amount:
+                                    positions[ticker]['amount'] = amount
+                                    positions[ticker]['balance'] = amount_balance
+                            accounts.update_one({'player_id': message.author.id}, {'$set': {'positions': positions}})
+                            accounts.update_one({'player_id': message.author.id}, {'$set': {'balance': account_balance + total_sell_price}})
+                        else:
+                            await message.channel.send(message.guild.name + ' only owns ' + str(positions[ticker]['amount']) + ' shares of ' + ticker + ', cannot sell ' + str(val) + ' shares!')
+                    else:
+                        await message.channel.send(message.guild.name + ' does not own any positions in ' + ticker + '!')                   
             else:
-                await message.channel.send('Invalid ticker! Please use !sell <ticker> <amount>')
+                await message.channel.send('Invalid amount! Please use !sell <ticker> <amount>')
+            
         else:
             await message.channel.send('Invalid command! Please use !sell <ticker> <amount>')
 
@@ -118,46 +126,51 @@ async def on_message(message):
     elif '!buy' in message.content:
         msg = buy_order_regex.match(str(message.content))
         if msg != None:
-            ticker = msg.group(1)
+            ticker = msg.group(1).upper()
             ticker_info = api.get_barset(ticker, 'minute', limit=1)[ticker]
-            if ticker_info:
-                price = ticker_info[0].c
-                if price != None:
-                    good_input = True
-                    val = -1
-                    try:
-                        val = int(msg.group(2))
-                    except ValueError:
-                        await message.channel.send('Invalid amount! Please use !buy <ticker> <amount>')
-                        good_input = False
-                    if good_input:
-                        total_value = price * val
-                        info = get_account_info(message.guild.name)
-                        positions = info['positions']
-                        account_balance = int(info['balance'])
-                        if total_value > account_balance:
-                            await message.channel.send('Not enough funds, account balance is $' + str(account_balance) + ', but this trade requires $' + str(total_value))
-                        else:
-                            if ticker in positions:
-                                positions[ticker]['amount'] += val
-                                positions[ticker]['balance'] += total_value
-                            else:
-                                positions[ticker] = {}
-                                positions[ticker]['amount'] = val
-                                positions[ticker]['balance'] = total_value
-                            accounts.update_one({'server': message.guild.name}, {'$set': {'positions': positions}})
-                            accounts.update_one({'server': message.guild.name}, {'$set': {'balance': account_balance - total_value}})
-                            await message.channel.send('Buy Order executed! ' + str(val) + ' shares of ' + ticker + ' were purchased for $' + str(price) + ' each!')
-                else:
+            amnt_msg_group = 2
+            if not ticker_info:
+                ticker = msg.group(2).upper()
+                ticker_info = api.get_barset(ticker, 'minute', limit=1)[ticker]
+                amnt_msg_group = 1
+                if not ticker_info:
                     await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount>')
+                    return
+            price = ticker_info[0].c
+            if price != None:
+                good_input = True
+                val = -1
+                try:
+                    val = int(msg.group(amnt_msg_group))
+                except ValueError:
+                    await message.channel.send('Invalid amount! Please use !buy <ticker> <amount>')
+                    good_input = False
+                if good_input:
+                    total_value = price * val
+                    info = get_account_info(message.author.id)
+                    positions = info['positions']
+                    account_balance = int(info['balance'])
+                    if total_value > account_balance:
+                        await message.channel.send('Not enough funds, account balance is $' + str(account_balance) + ', but this trade requires $' + str(total_value))
+                    else:
+                        if ticker in positions:
+                            positions[ticker]['amount'] += val
+                            positions[ticker]['balance'] += total_value
+                        else:
+                            positions[ticker] = {}
+                            positions[ticker]['amount'] = val
+                            positions[ticker]['balance'] = total_value
+                        accounts.update_one({'player_id': message.author.id}, {'$set': {'positions': positions}})
+                        accounts.update_one({'player_id': message.author.id}, {'$set': {'balance': account_balance - total_value}})
+                        await message.channel.send('Buy Order executed! ' + str(val) + ' shares of ' + ticker + ' were purchased for $' + str(price) + ' each!')
             else:
                 await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount>')
         else:
             await message.channel.send('Invalid command! Please use !buy <ticker> <amount>')
 
     elif '!account' in message.content:
-        my_message = '\n' + str(message.guild.name) + ' Trading Account Summary:'
-        info = get_account_info(message.guild.name)
+        my_message = '\n' + str(message.author.name) + ' Trading Account Summary:'
+        info = get_account_info(message.author.id)
         total_account_value = float(info['balance'])
         my_message += '\nPositions:'
         for x in info['positions']:
