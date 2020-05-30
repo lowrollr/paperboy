@@ -8,6 +8,7 @@ import time
 import csv
 import pymongo
 import json
+import requests
 
 load_dotenv()
 client = pymongo.MongoClient('mongodb+srv://dbAdmin:'+os.getenv('DB_PASS')+'@paperboy-cluster-owzvv.gcp.mongodb.net/test?retryWrites=true&w=majority')
@@ -28,6 +29,12 @@ client = discord.Client()
 
 
 api = alpaca.REST(os.getenv('API_KEY'), os.getenv('SECRET_KEY'), os.getenv('ENDPOINT_URL'))
+clock = api.get_clock()
+
+my_ticker_names = {}
+my_data = requests.get('https://api.iextrading.com/1.0/ref-data/symbols').json()
+for x in my_data:
+    my_ticker_names[x['symbol']] = x['name']
 
 
 def get_account_info(player):
@@ -53,10 +60,34 @@ async def on_message(message):
     if '!price' in message.content:
         msg = price_regex.match(str(message.content))
         if msg != None:
-            ticker = msg.group(1)
+            ticker = msg.group(1).upper()
+            price_day = 0.0
+            if clock.is_open:
+                price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
+            else:
+                price_day = api.get_barset(ticker, 'day', limit=1)[ticker][0].c
             price = api.get_barset(ticker, 'minute', limit=1)[ticker][0].c
             if price != None:
-                await message.channel.send(ticker + ' price = $' + str(price))
+                diff = float(price) - float(price_day)
+                perc_change = (float(price) / float(price_day)) - 1.00
+                my_perc_str = ''
+                my_price_str = ''
+                my_color = 0xFF0000
+                if diff > 0.0:
+                    my_color = 0x00FF00
+                    my_perc_str += '+'
+                    my_price_str += '+'
+                my_price_str += str(round(diff, 2))
+                my_perc_str += str(round(perc_change, 4)) + '%'
+                thumb_str = 'https://s3.polygon.io/logos/' + ticker.lower() + '/logo.png'
+                if ticker == 'MSFT':
+                    thumb_str = 'https://eodhistoricaldata.com/img/logos/US/MSFT.png'
+                my_embed = discord.Embed( timestamp=datetime.now(), color=my_color)
+                my_embed.set_author(name=my_ticker_names[ticker])
+                my_embed.set_thumbnail(url=thumb_str)
+                my_embed.add_field(name='**'+ticker+'**', value=my_price_str)
+                my_embed.add_field(name='**'+str(price)+'**', value=my_perc_str)
+                await message.channel.send(embed=my_embed)
             else:
                 await message.channel.send('Invalid ticker! Could not retrieve info for ' + ticker)
         else:
@@ -73,7 +104,7 @@ async def on_message(message):
                 ticker_info = api.get_barset(ticker, 'minute', limit=1)[ticker]
                 amnt_msg_group = 1
                 if not ticker_info:
-                    await message.channel.send('Invalid ticker! Please use !sell <ticker> <amount>')
+                    await message.channel.send('Invalid ticker! Please use !sell <ticker> <amount> or !sell <amount> <ticker>')
                     return
             price = ticker_info[0].c
             if price != None:
@@ -82,7 +113,7 @@ async def on_message(message):
                 try:
                     val = int(msg.group(amnt_msg_group))
                 except ValueError:
-                    await message.channel.send('Invalid amount! Please use !sell <ticker> <amount>')
+                    await message.channel.send('Invalid amount! Please use !sell <ticker> <amount> or !sell <amount> <ticker>')
                     good_input = False
                 if good_input:
                     info = get_account_info(message.author.id)
@@ -117,10 +148,10 @@ async def on_message(message):
                     else:
                         await message.channel.send(message.guild.name + ' does not own any positions in ' + ticker + '!')                   
             else:
-                await message.channel.send('Invalid amount! Please use !sell <ticker> <amount>')
+                await message.channel.send('Invalid amount! Please use !sell <ticker> <amount> or !sell <amount> <ticker>')
             
         else:
-            await message.channel.send('Invalid command! Please use !sell <ticker> <amount>')
+            await message.channel.send('Invalid command! Please use !sell <ticker> <amount> or !sell <amount> <ticker>')
 
 
     elif '!buy' in message.content:
@@ -134,7 +165,7 @@ async def on_message(message):
                 ticker_info = api.get_barset(ticker, 'minute', limit=1)[ticker]
                 amnt_msg_group = 1
                 if not ticker_info:
-                    await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount>')
+                    await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount> or !buy <amount> <ticker>')
                     return
             price = ticker_info[0].c
             if price != None:
@@ -143,7 +174,7 @@ async def on_message(message):
                 try:
                     val = int(msg.group(amnt_msg_group))
                 except ValueError:
-                    await message.channel.send('Invalid amount! Please use !buy <ticker> <amount>')
+                    await message.channel.send('Invalid amount! Please use !buy <ticker> <amount> or !buy <amount> <ticker>')
                     good_input = False
                 if good_input:
                     total_value = price * val
@@ -164,9 +195,9 @@ async def on_message(message):
                         accounts.update_one({'player_id': message.author.id}, {'$set': {'balance': account_balance - total_value}})
                         await message.channel.send('Buy Order executed! ' + str(val) + ' shares of ' + ticker + ' were purchased for $' + str(price) + ' each!')
             else:
-                await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount>')
+                await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount> or !buy <amount> <ticker>')
         else:
-            await message.channel.send('Invalid command! Please use !buy <ticker> <amount>')
+            await message.channel.send('Invalid command! Please use !buy <ticker> <amount> or !buy <amount> <ticker>')
 
     elif '!account' in message.content:
         my_message = '\n' + str(message.author.name) + ' Trading Account Summary:'
