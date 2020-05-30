@@ -45,6 +45,8 @@ my_data = requests.get('https://api.iextrading.com/1.0/ref-data/symbols').json()
 for x in my_data:
     my_ticker_names[x['symbol']] = x['name']
 
+def get_prices():
+    return db_prices.find_one({})
 
 #gets the account corresponding to a given player id
 def get_account_info(player):
@@ -82,7 +84,7 @@ async def on_message(message):
                     price_day = api.get_barset(ticker, 'day', limit=1)[ticker][0].c
                 else:
                     price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
-                price = db_prices[ticker]
+                price = get_prices()[ticker]
             except IndexError:
                 await message.channel.send('Invalid ticker! Could not retrieve info for ' + ticker)
                 return
@@ -117,15 +119,16 @@ async def on_message(message):
 
 
             pirce = 0.00
+            my_prices = get_prices()
             ticker = msg.group(1).upper()
             amnt_msg_group = 2
             try:
-                price = db_prices[ticker]
+                price = my_prices[ticker]
             except KeyError:
                 try:
                     amnt_msg_group = 1
                     ticker = msg.group(2).upper()
-                    price = db_prices[ticker]
+                    price = my_prices[ticker]
                 except KeyError:
                     await message.channel.send('Invalid ticker! Please use !sell <ticker> <amount> or !sell <amount> <ticker>')
                     return
@@ -178,15 +181,16 @@ async def on_message(message):
         msg = buy_order_regex.match(str(message.content))
         if msg != None:
             price = 0.00
+            my_prices = get_prices()
             ticker = msg.group(1).upper()
             amnt_msg_group = 2
             try:
-                price = db_prices[ticker]
+                price = my_prices[ticker]
             except KeyError:
                 try:
                     amnt_msg_group = 1
                     ticker = msg.group(2).upper()
-                    price = db_prices[ticker]
+                    price = my_prices[ticker]
                 except KeyError:
                     await message.channel.send('Invalid ticker! Please use !buy <ticker> <amount> or !buy <amount> <ticker>')
                     return
@@ -228,7 +232,7 @@ async def on_message(message):
         for x in info['positions']:
             amount = float(info['positions'][x]['amount'])
             orig_pay = float(info['positions'][x]['balance'])
-            cur_price = db_prices[x]
+            cur_price = get_prices()[x]
             delta = 0
             cur_value = amount * cur_price
             if cur_price != None:
