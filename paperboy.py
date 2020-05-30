@@ -62,34 +62,36 @@ async def on_message(message):
         if msg != None:
             ticker = msg.group(1).upper()
             price_day = 0.0
-            if clock.is_open:
-                price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
-            else:
-                price_day = api.get_barset(ticker, 'day', limit=1)[ticker][0].c
-            price = api.get_barset(ticker, 'minute', limit=1)[ticker][0].c
-            if price != None:
-                diff = float(price) - float(price_day)
-                perc_change = (float(price) / float(price_day)) - 1.00
-                my_perc_str = ''
-                my_price_str = ''
-                my_color = 0xFF0000
-                if diff > 0.0:
-                    my_color = 0x00FF00
-                    my_perc_str += '+'
-                    my_price_str += '+'
-                my_price_str += str(round(diff, 2))
-                my_perc_str += str(round(perc_change, 4)) + '%'
-                thumb_str = 'https://s3.polygon.io/logos/' + ticker.lower() + '/logo.png'
-                if ticker == 'MSFT':
-                    thumb_str = 'https://eodhistoricaldata.com/img/logos/US/MSFT.png'
-                my_embed = discord.Embed( timestamp=message.created_at, color=my_color)
-                my_embed.set_author(name=my_ticker_names[ticker])
-                my_embed.set_thumbnail(url=thumb_str)
-                my_embed.add_field(name='**'+ticker+'**', value=my_price_str)
-                my_embed.add_field(name='**'+str(price)+'**', value=my_perc_str)
-                await message.channel.send(embed=my_embed)
-            else:
+            try:
+                if clock.is_open:
+                    price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
+                else:
+                    price_day = api.get_barset(ticker, 'day', limit=1)[ticker][0].c
+                price = api.get_barset(ticker, 'minute', limit=1)[ticker][0].c
+            except IndexError:
                 await message.channel.send('Invalid ticker! Could not retrieve info for ' + ticker)
+                return
+            diff = float(price) - float(price_day)
+            perc_change = (float(price) / float(price_day)) - 1.00
+            my_perc_str = ''
+            my_price_str = ''
+            my_color = 0xFF0000
+            if diff > 0.0:
+                my_color = 0x00FF00
+                my_perc_str += '+'
+                my_price_str += '+'
+            my_price_str += str(round(diff, 2))
+            my_perc_str += str(round(perc_change, 4)) + '%'
+            thumb_str = 'https://s3.polygon.io/logos/' + ticker.lower() + '/logo.png'
+            if ticker == 'MSFT':
+                thumb_str = 'https://eodhistoricaldata.com/img/logos/US/MSFT.png'
+            my_embed = discord.Embed( timestamp=message.created_at, color=my_color)
+            my_embed.set_author(name=my_ticker_names[ticker])
+            my_embed.set_thumbnail(url=thumb_str)
+            my_embed.add_field(name='**'+ticker+'**', value=my_price_str)
+            my_embed.add_field(name='**'+str(price)+'**', value=my_perc_str)
+            await message.channel.send(embed=my_embed)
+            
         else:
             await message.channel.send('Invalid command!')
         
