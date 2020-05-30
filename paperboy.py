@@ -64,15 +64,15 @@ async def on_message(message):
             price_day = 0.0
             try:
                 if clock.is_open:
-                    price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
-                else:
                     price_day = api.get_barset(ticker, 'day', limit=1)[ticker][0].c
+                else:
+                    price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
                 price = api.get_barset(ticker, 'minute', limit=1)[ticker][0].c
             except IndexError:
                 await message.channel.send('Invalid ticker! Could not retrieve info for ' + ticker)
                 return
             diff = float(price) - float(price_day)
-            perc_change = (float(price) / float(price_day)) - 1.00
+            perc_change = ((float(price) / float(price_day)) - 1.00) * 100.0
             my_perc_str = ''
             my_price_str = ''
             my_color = 0xFF0000
