@@ -82,7 +82,7 @@ async def on_message(message):
                 thumb_str = 'https://s3.polygon.io/logos/' + ticker.lower() + '/logo.png'
                 if ticker == 'MSFT':
                     thumb_str = 'https://eodhistoricaldata.com/img/logos/US/MSFT.png'
-                my_embed = discord.Embed( timestamp=datetime.now(), color=my_color)
+                my_embed = discord.Embed( timestamp=message.created_at, color=my_color)
                 my_embed.set_author(name=my_ticker_names[ticker])
                 my_embed.set_thumbnail(url=thumb_str)
                 my_embed.add_field(name='**'+ticker+'**', value=my_price_str)
