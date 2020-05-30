@@ -64,9 +64,9 @@ async def on_message(message):
             price_day = 0.0
             try:
                 if clock.is_open:
-                    price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
-                else:
                     price_day = api.get_barset(ticker, 'day', limit=1)[ticker][0].c
+                else:
+                    price_day = api.get_barset(ticker, 'day', limit=2)[ticker][0].c
                 price = api.get_barset(ticker, 'minute', limit=1)[ticker][0].c
             except IndexError:
                 await message.channel.send('Invalid ticker! Could not retrieve info for ' + ticker)
