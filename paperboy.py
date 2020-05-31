@@ -9,6 +9,7 @@ import csv
 import pymongo
 import json
 import requests
+import matplotlib.pyplot as plt
 
 #set up python env (used to access server environment variables)
 load_dotenv()
@@ -25,7 +26,7 @@ db_prices = db['Prices']
 sell_order_regex = re.compile('^\!sell (.*) (.*)')
 buy_order_regex = re.compile('^\!buy (.*) (.*)')
 price_regex = re.compile('^\!price (.*)')
-week_format_regex = re.compile('^([0-6])\/.*')
+week_format_regex = re.compile('^(.*)\/(.*)\/(.*)')
 
 #grab discord tokens from env
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -45,6 +46,11 @@ my_ticker_names = {}
 my_data = requests.get('https://api.iextrading.com/1.0/ref-data/symbols').json()
 for x in my_data:
     my_ticker_names[x['symbol']] = x['name']
+
+def process_date(my_date):
+    cur_day = datetime.today().weekday()
+    my_day = int(week_format_regex.match(my_date).group(1))
+    return (my_day + (6 - cur_day))%6
 
 def get_prices():
     return db_prices.find_one({})
@@ -256,18 +262,69 @@ async def on_message(message):
                 my_bal = str(round(cur_price*amount - pos_balance, 2))
                 my_perc_ch = str(round((cur_price*amount - pos_balance) / cur_price*amount, 2))
             my_stocks_str += '**' + p + ' | ' + my_delta + '  ' + my_perc + '%**\n'
-            my_stocks_str += '> *' + str(amount) + ' Positions | ' + my_bal + '  ' + my_perc_ch + '%*\n'
+            my_stocks_str += '*' + str(amount) + ' Positions | ' + my_bal + '  ' + my_perc_ch + '%*\n'
         if total_delta > 0.0:
             my_color = 0x00FF00
             my_tot_delta = '+'+ str(round(total_delta, 2))
         else:
             my_color = 0xFF0000
             my_tot_delta = str(round(total_delta, 2))
-        my_stocks_str += '\n**BUYING POWER ' + str(round(info['balance'], 2)) +'**\n'
-        my_stocks_str += '**ACCOUNT VALUE ' + str(round(total_account_value, 2)) + '  ' + my_tot_delta +'**\n'
+        all_delta = total_account_value - 1000000
+        if all_delta > 0.0:
+            my_all_delta = '+' + str(round(all_delta, 2))
+        else:
+            my_all_delta = str(round(all_delta, 2))
+
+        #make the graph
+        dates = []
+        for date in info['history']['weekday']:
+            dates += [date]
+        dates.sort(key=process_date)
+        put_on_end_x = []
+        put_on_end_y = []
+        graph_x = []
+        graph_y = []
+        for d in dates:
+            my_price = info['history']['weekday'][d]
+            my_date_r = week_format_regex.match(d)
+            week_day = my_date_r.group(1)
+            hour = my_date_r.group(2)
+            minute = my_date_r.group(3)
+            cur_week_day = datetime.today().weekday()
+            cur_hour = datetime.now().hour
+            cur_min = datetime.now().minute
+            if cur_week_day == week_day:
+                if (hour < cur_hour or (hour == cur_hour and minute < cur_min)):
+                    put_on_end_x += [d]
+                    put_on_end_y += [my_price]
+            else:
+                graph_x += [d]
+                graph_y += [my_price]
+        graph_x += put_on_end_x
+        graph_y += put_on_end_y
+        
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        if all_delta >= 0.0:
+            ax.plot(graph_x, graph_y, color='r')
+        else:
+            ax.plot(graph_x, graph_y, color='g')
+        ax.set_xticks([]) 
+        ax.set_yticks([])
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('white')
+        ax.spines['bottom'].set_color('white')
+        path = './graphs/' + str(message.author) + '.png'
+        plt.savefig(path, bbox_inches='tight', transparent=True)
+        my_image = discord.File(path, filename='image.png')
+        my_stocks_str += '\n**BUYING POWER | ' + str(round(info['balance'], 2)) +'**\n'
+        my_stocks_str += '**ACCOUNT VALUE | ' + str(round(total_account_value, 2)) + '  ( ' + my_tot_delta + ' Day )  ( ' + my_all_delta + ' Ovr )**\n'
         my_embed = discord.Embed(timestamp=message.created_at, color=my_color, description=my_stocks_str)
-        my_embed.set_author(name='**TRADING ACCOUNT SUMMARY -- ' + str(message.author).upper() + '**')
-        await message.channel.send(embed=my_embed)
+        
+        my_embed.set_image(url='attachment://image.png')
+        my_embed.set_author(name='TRADING ACCOUNT SUMMARY -- ' + str(message.author.name).upper())
+        await message.channel.send(embed=my_embed, file=my_image)
     elif '!help' in message.content:
         my_message = "!account: displays account balance, buying power, and current held positions\n!buy : If able, purchases X shares of a given ticker for it's current price\n!sell : If able, sells X shares of a given ticker from your server's portfolio\n!price : Get the current price of a given ticker\nAll ticker names and prices are referenced from NASDAQ."
         await message.channel.send(my_message)
