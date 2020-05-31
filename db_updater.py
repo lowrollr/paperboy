@@ -25,7 +25,7 @@ prices = {}
 for a in assets:
     if a.symbol == 'SPY':
         print(a.exchange)
-    if a.tradable and a.status == 'active' and (a.exchange == 'NASDAQ' or a.exchange == 'ARCA'):
+    if a.tradable and a.status == 'active' and (a.exchange == 'NYSE' or a.exchange == 'NASDAQ' or a.exchange == 'ARCA'):
         prices[a.symbol] = 0.00
 
 bars = {}

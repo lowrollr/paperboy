@@ -25,6 +25,7 @@ db_prices = db['Prices']
 sell_order_regex = re.compile('^\!sell (.*) (.*)')
 buy_order_regex = re.compile('^\!buy (.*) (.*)')
 price_regex = re.compile('^\!price (.*)')
+week_format_regex = re.compile('^([0-6])\/.*')
 
 #grab discord tokens from env
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -102,7 +103,7 @@ async def on_message(message):
             thumb_str = 'https://s3.polygon.io/logos/' + ticker.lower() + '/logo.png'
             if ticker == 'MSFT':
                 thumb_str = 'https://eodhistoricaldata.com/img/logos/US/MSFT.png'
-            my_embed = discord.Embed( timestamp=message.created_at, color=my_color)
+            my_embed = discord.Embed(timestamp=message.created_at, color=my_color)
             my_embed.set_author(name=my_ticker_names[ticker])
             my_embed.set_thumbnail(url=thumb_str)
             my_embed.add_field(name='**'+ticker+'**', value=my_price_str)
@@ -115,10 +116,7 @@ async def on_message(message):
     elif '!sell' in message.content:
         msg = sell_order_regex.match(str(message.content))
         if msg != None:
-            
-
-
-            pirce = 0.00
+            price = 0.00
             my_prices = get_prices()
             ticker = msg.group(1).upper()
             amnt_msg_group = 2
@@ -225,36 +223,59 @@ async def on_message(message):
             await message.channel.send('Invalid command! Please use !buy <ticker> <amount> or !buy <amount> <ticker>')
 
     elif '!account' in message.content:
-        my_message = '\n' + str(message.author.name) + ' Trading Account Summary:'
         info = get_account_info(message.author.id)
-        total_account_value = float(info['balance'])
-        my_message += '\nPositions:'
-        for x in info['positions']:
-            amount = float(info['positions'][x]['amount'])
-            orig_pay = float(info['positions'][x]['balance'])
-            cur_price = get_prices()[x]
-            delta = 0
-            cur_value = amount * cur_price
-            if cur_price != None:
-                total_account_value += cur_value
-                delta = cur_value - orig_pay
-            my_message += '\n ' + str(int(amount)) + ' ' + x + ': ' + str(int(amount)) + 'x' + str(cur_price) + ' = $' + str(round(cur_value, 2)) + '\t'
-            if delta < 0:
-                my_message += '($'
+        total_account_value = info['balance']
+        my_prices = get_prices()
+        my_stocks_str = ''
+        total_delta = 0.0
+        for p in info['positions']:
+            amount = info['positions'][p]['amount']
+            pos_balance = info['positions'][p]['balance']
+            cur_price = my_prices[p]
+            total_account_value += amount * cur_price
+            if clock.is_open:
+                price_day = api.get_barset(p, 'day', limit=1)[p][0].c
             else:
-                my_message += '(+$'
-            my_message += str(round(delta, 2)) + ')\t('
-            if delta < 0:
-                my_message += ' '
+                price_day = api.get_barset(p, 'day', limit=2)[p][0].c
+            
+            delta = cur_price - price_day
+            total_delta += delta * amount
+            
+            if delta > 0.0:
+                my_stocks_str += '🟢 '
+                my_delta = '+' + str(round(delta, 2))
+                my_perc = '+' + str(round(((delta/price_day)*100.0), 2))
             else:
-                my_message += ' +'
-            my_message += str(round(100.0*(delta/cur_value), 2)) + '% )'    
-        my_message += '\nAccount Buying Power: $' + str(round(info['balance'], 2))
-        my_message += '\nTotal Account Value : $' + str(round(total_account_value, 2))
-        await message.channel.send(my_message)
+                my_stocks_str += '🔴 '
+                my_delta = str(round(delta, 2))
+                my_perc = str(round(((delta/price_day)*100.0), 2))
+            if cur_price - pos_balance > 0.0:
+                my_bal = '+' + str(round(cur_price*amount - pos_balance, 2))
+                my_perc_ch = '+' + str(round((cur_price*amount - pos_balance) / cur_price*amount, 2))
+            else:
+                my_bal = str(round(cur_price*amount - pos_balance, 2))
+                my_perc_ch = str(round((cur_price*amount - pos_balance) / cur_price*amount, 2))
+            my_stocks_str += '**' + p + ' | ' + my_delta + '  ' + my_perc + '%**\n'
+            my_stocks_str += '> *' + str(amount) + ' Positions | ' + my_bal + '  ' + my_perc_ch + '%*\n'
+        if total_delta > 0.0:
+            my_color = 0x00FF00
+            my_tot_delta = '+'+ str(round(total_delta, 2))
+        else:
+            my_color = 0xFF0000
+            my_tot_delta = str(round(total_delta, 2))
+        my_stocks_str += '\n**BUYING POWER ' + str(round(info['balance'], 2)) +'**\n'
+        my_stocks_str += '**ACCOUNT VALUE ' + str(round(total_account_value, 2)) + '  ' + my_tot_delta +'**\n'
+        my_embed = discord.Embed(timestamp=message.created_at, color=my_color, description=my_stocks_str)
+        my_embed.set_author(name='**TRADING ACCOUNT SUMMARY -- ' + str(message.author).upper() + '**')
+        await message.channel.send(embed=my_embed)
     elif '!help' in message.content:
         my_message = "!account: displays account balance, buying power, and current held positions\n!buy : If able, purchases X shares of a given ticker for it's current price\n!sell : If able, sells X shares of a given ticker from your server's portfolio\n!price : Get the current price of a given ticker\nAll ticker names and prices are referenced from NASDAQ."
         await message.channel.send(my_message)
+
+
+
+    
+        
 
 def start_discord_client():    
     client.run(TOKEN)
