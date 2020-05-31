@@ -306,17 +306,17 @@ async def on_message(message):
         fig = plt.figure()
         ax = fig.add_subplot()
         if all_delta >= 0.0:
-            ax.plot(graph_x, graph_y, color='r')
+            ax.plot(graph_x, graph_y, color='g', linewidth=3)
         else:
-            ax.plot(graph_x, graph_y, color='g')
+            ax.plot(graph_x, graph_y, color='r', linewidth=3)
         ax.set_xticks([]) 
         ax.set_yticks([])
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_color('white')
-        ax.spines['bottom'].set_color('white')
+        ax.spines['left'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
         path = './graphs/' + str(message.author) + '.png'
-        plt.savefig(path, bbox_inches='tight', transparent=True)
+        plt.savefig(path, bbox_inches='tight', transparent=True, dpi=100)
         my_image = discord.File(path, filename='image.png')
         my_stocks_str += '\n**BUYING POWER | ' + str(round(info['balance'], 2)) +'**\n'
         my_stocks_str += '**ACCOUNT VALUE | ' + str(round(total_account_value, 2)) + '  ( ' + my_tot_delta + ' Day )  ( ' + my_all_delta + ' Ovr )**\n'

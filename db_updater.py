@@ -103,6 +103,7 @@ def collect():
     update_account_history_min(False)    
     read_prices_to_db()
 
+
 while(True):
     if clock.is_open:
         collect()
