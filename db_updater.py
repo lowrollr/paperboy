@@ -4,22 +4,25 @@ import os
 import datetime
 import alpaca_trade_api as alpaca
 import time
-#set up python env (used to access server environment variables)
+# set up python env (used to access server environment variables)
 load_dotenv()
 
-#set up mongo client
-mongo_client = pymongo.MongoClient('mongodb+srv://dbAdmin:'+os.getenv('DB_PASS')+'@paperboy-cluster-owzvv.gcp.mongodb.net/test?retryWrites=true&w=majority')
+# set up mongo client
+mongo_client = pymongo.MongoClient('mongodb+srv://dbAdmin:'+os.getenv('DB_PASS')+'@paperboycluster.dltvp.mongodb.net/PaperboyCluster?retryWrites=true&w=majority')
 db = mongo_client.get_default_database()
 
-#grab the accounts table
+# grab the accounts table
 accounts = db['Accounts']
 db_prices = db['Prices']
 
 all_accounts = {}
 
+# connect to alpaca
 api = alpaca.REST(os.getenv('API_KEY'), os.getenv('SECRET_KEY'), os.getenv('ENDPOINT_URL'))
+account = api.get_account()
 clock = api.get_clock()
 
+# fetch list of symbols to keep updated
 assets = api.list_assets()
 prices = {}
 for a in assets:
@@ -78,7 +81,7 @@ def update_account_history_min(first):
 
 def collect():
     first = True
-    while clock.is_open:
+    while True: #while clock.is_open:
         print('collecting!')
         now = datetime.datetime.now()
         next_1_min = (now.minute)%60
@@ -105,6 +108,6 @@ def collect():
 
 
 while(True):
-    if clock.is_open:
-        collect()
+    #if clock.is_open:
+    collect()
     

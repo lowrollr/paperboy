@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 load_dotenv()
 
 #set up mongo client
-mongo_client = pymongo.MongoClient('mongodb+srv://dbAdmin:'+os.getenv('DB_PASS')+'@paperboy-cluster-owzvv.gcp.mongodb.net/test?retryWrites=true&w=majority')
+mongo_client = pymongo.MongoClient('mongodb+srv://dbAdmin:'+os.getenv('DB_PASS')+'@paperboycluster.dltvp.mongodb.net/PaperboyCluster?retryWrites=true&w=majority')
 db = mongo_client.get_default_database()
 
 #grab the accounts table
